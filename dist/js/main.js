@@ -28403,10 +28403,15 @@ var Detector = React.createClass({displayName: 'Detector',
   },
 
   componentDidMount:function(){
-    var thisObj = this;
+    var thisObj = this,
+      canvas = document.getElementById(this.props.id),
+      ctxObj = canvas.getContext('2d');
+
     d3.csv("data/detector_inventory.csv", function(error, lane_detectors){
-      thisObj.setState({data: lane_detectors});
-      console.log(lane_detectors);
+      thisObj.setState({
+        data: lane_detectors,
+        ctx: ctxObj
+      });
     });
   },
 
@@ -28418,11 +28423,15 @@ var Detector = React.createClass({displayName: 'Detector',
       var longitude = +this.state.data[key].longitude;
       var latitude = +this.state.data[key].latitude;
       var transf = "translate(" + thisObj.props.projection([longitude, latitude]) + ")";
-      circles.push(React.DOM.circle({r: thisObj.state.radius, transform: transf}));
+      var translate = thisObj.props.projection([longitude, latitude]);
+      // circles.push(<circle r={thisObj.state.radius} transform={transf}></circle>);
+      this.state.ctx.beginPath();
+      this.state.ctx.arc(translate[0],translate[1],thisObj.state.radius,0,Math.PI*2,true); 
+      this.state.ctx.fill();
     }
 
     return (
-      React.DOM.g(null, circles)
+      React.DOM.g(null)
     )
   }
 });
@@ -28434,12 +28443,17 @@ var Tile = React.createClass({displayName: 'Tile',
 
   componentDidMount:function(){
     var thisObj = this,
-        d = this.props.data;
-    
+        d = this.props.data,
+        canvas = document.getElementById(this.props.id),
+        ctxObj = canvas.getContext('2d');
+
     d3.json("http://" + ["a", "b", "c"][(d[0] * 31 + d[1]) % 3] + ".tile.openstreetmap.us/"+thisObj.props.type+"/" + d[2] + "/" + d[0] + "/" + d[1] + ".json", function(error, json) {
       if (error) return console.error(error);
       var featuresObj = json.features.sort(function(a, b) { return a.properties.sort_key - b.properties.sort_key; });
-      thisObj.setState({ features: featuresObj });
+      thisObj.setState({ 
+        features: featuresObj,
+        ctx: ctxObj 
+      });
     });
   },
 
@@ -28450,11 +28464,34 @@ var Tile = React.createClass({displayName: 'Tile',
     if (thisObj.state.features) {
       thisObj.state.features.forEach(function(name){ 
         dVal = thisObj.props.path(name.geometry);
-        paths.push(React.DOM.path({className: name.properties.kind, d: dVal}))
+        var path = new Path2D(dVal);
+        if(thisObj.props.type == "vectiles-highroad"){
+          switch(name.properties.kind){
+            case "major_road":
+              thisObj.state.ctx.strokeStyle = "#aaa";
+              break;
+            case "minor_road":
+              thisObj.state.ctx.strokeStyle = "#ddd";
+              break;
+            case "highway":
+            case "bridge":
+              thisObj.state.ctx.strokeStyle = "#999";
+              break;
+            case "rail":
+              thisObj.state.ctx.strokeStyle = "#7de";
+              break;
+            default:
+              break;
+          }
+          thisObj.state.ctx.stroke(path);
+        } else if (thisObj.props.type == "vectiles-water-areas"){
+          thisObj.state.ctx.fillStyle = "#E9FBFF";
+          thisObj.state.ctx.fill(path);
+        }
       }); 
     }
 
-    return (React.DOM.g(null, paths))
+    return (React.DOM.g(null))
   }
 });
 
@@ -28480,7 +28517,7 @@ var Map = React.createClass({displayName: 'Map',
       return {
         path: calcPath,
         projection: projection,
-        tiles: tilesArray
+        tiles: tilesArray,
       }
     },
 
@@ -28492,16 +28529,38 @@ var Map = React.createClass({displayName: 'Map',
 
       for(key in this.state.tiles){
         if(thisObj.state.tiles[key].length > 2) {
-          waterTiles.push(Tile({type: "vectiles-water-areas", path: thisObj.state.path, data: thisObj.state.tiles[key]}));
-          roadTiles.push(Tile({type: "vectiles-highroad", path: thisObj.state.path, data: thisObj.state.tiles[key]}));
+          waterTiles.push(Tile({type: "vectiles-water-areas", path: thisObj.state.path, data: thisObj.state.tiles[key], id: "waterTiles"}));
+          roadTiles.push(Tile({type: "vectiles-highroad", path: thisObj.state.path, data: thisObj.state.tiles[key], id: "roadTiles"}));
         }
       };
 
       return (
-        React.DOM.g(null, 
-          React.DOM.g({className: "waterTiles"}, waterTiles), 
-          React.DOM.g({className: "roadTiles"}, roadTiles), 
-          React.DOM.g({classname: "detectors"}, Detector({projection: this.state.projection}))
+        React.DOM.div(null, 
+          React.DOM.canvas({
+            width: this.props.width, 
+            height: this.props.height, 
+            className: "detectors", 
+            id: "detectors"}, 
+              Detector({
+                id: "detectors", 
+                className: "detectors", 
+                projection: this.state.projection}
+              )
+          ), 
+          React.DOM.canvas({
+            width: this.props.width, 
+            height: this.props.height, 
+            className: "roadTiles", 
+            id: "roadTiles"}, 
+              roadTiles
+          ), 
+          React.DOM.canvas({
+            width: this.props.width, 
+            height: this.props.height, 
+            className: "waterTiles", 
+            id: "waterTiles"}, 
+              waterTiles
+          )
         )
       )
     }
@@ -28516,10 +28575,7 @@ var Map = require('../components/Map.js');
 var Graph = React.createClass({displayName: 'Graph',
     render:function(){
       return (
-        React.DOM.svg({
-          width: this.props.width, 
-          height: this.props.height}, 
-          
+        React.DOM.div(null, 
           Map({
             width: this.props.width, 
             height: this.props.height
@@ -28533,7 +28589,7 @@ var App = React.createClass({displayName: 'App',
     getDefaultProps: function() {
       return {
         width: window.innerWidth,
-        height: window.innerHeight
+        height: window.innerHeight,
       }
     },
 
@@ -28542,7 +28598,8 @@ var App = React.createClass({displayName: 'App',
         React.DOM.div({className: "wrapper"}, 
           Graph({
             width: this.props.width, 
-            height: this.props.height}
+            height: this.props.height
+          }
           )
         )
       )
