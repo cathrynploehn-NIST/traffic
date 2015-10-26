@@ -5,15 +5,12 @@ var Map = require('../components/Map.js');
 var Graph = React.createClass({
     render:function(){
       return (
-        <svg 
-          width={this.props.width}
-          height={this.props.height}> 
-          
+        <div>
           <Map 
             width={this.props.width}
             height={this.props.height}
           ></Map>       
-        </svg>
+        </div>
       )
     }
   });
@@ -22,7 +19,7 @@ var App = React.createClass({
     getDefaultProps: function() {
       return {
         width: window.innerWidth,
-        height: window.innerHeight
+        height: window.innerHeight,
       }
     },
 
@@ -31,7 +28,8 @@ var App = React.createClass({
         <div className="wrapper">
           <Graph 
             width={this.props.width}
-            height={this.props.height} >
+            height={this.props.height} 
+          >
           </Graph> 
         </div>
       )
