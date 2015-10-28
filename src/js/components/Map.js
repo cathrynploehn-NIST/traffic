@@ -3,6 +3,7 @@ var React = require('react');
 var d3 = require('d3');
 var topojson = require('topojson');
 var d3geotile = require('d3.geo.tile');
+var renderqueue = require('../util/renderqueue.js');
 
 var Overlay = React.createClass({
   getInitialState:function(){
@@ -166,7 +167,7 @@ var Map = React.createClass({
 
       // Array of information for tiles
       var tilesArray = tilerObj(0);
-      
+
       return {
         path: calcPath,
         projection: projection,
