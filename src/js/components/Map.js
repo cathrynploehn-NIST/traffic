@@ -3,6 +3,7 @@ var React = require('react');
 var d3 = require('d3');
 var topojson = require('topojson');
 var d3geotile = require('d3.geo.tile');
+var renderQueue = require('../util/renderqueue.js')
 
 var Overlay = React.createClass({
   getInitialState:function(){
@@ -55,52 +56,33 @@ var Tile = React.createClass({
 
   componentDidMount:function(){
     var thisObj = this,
-        d = this.props.data,
-        canvas = document.getElementById(this.props.id),
-        ctxObj = canvas.getContext('2d');
+          d = this.props.data;
 
-    d3.json("http://" + ["a", "b", "c"][(d[0] * 31 + d[1]) % 3] + ".tile.openstreetmap.us/"+thisObj.props.type+"/" + d[2] + "/" + d[0] + "/" + d[1] + ".json", function(error, json) {
+    this.xhr = d3.json("http://" + ["a", "b", "c"][(d[0] * 31 + d[1]) % 3] + ".tile.openstreetmap.us/"+thisObj.props.type+"/" + d[2] + "/" + d[0] + "/" + d[1] + ".json", function(error, json) {
       if (error) return console.error(error);
       var featuresObj = json.features.sort(function(a, b) { return a.properties.sort_key - b.properties.sort_key; });
       thisObj.setState({ 
         features: featuresObj,
-        ctx: ctxObj 
       });
-    });
+    }.bind(this));
+  },
+
+  componentWillUnmount: function(){
+    this.xhr.abort();
   },
 
   render: function(){
     var paths = [],
       thisObj = this;
 
-    if (thisObj.state.features && this.state.ctx) {
+    if (thisObj.state.features) {
       thisObj.state.features.forEach(function(name){ 
         dVal = thisObj.props.path(name.geometry);
         var path = new Path2D(dVal);
-        if(thisObj.props.type == "vectiles-highroad"){
-          switch(name.properties.kind){
-            case "major_road":
-              thisObj.state.ctx.strokeStyle = "#aaa";
-              break;
-            case "minor_road":
-              thisObj.state.ctx.strokeStyle = "#ddd";
-              break;
-            case "highway":
-            case "bridge":
-              thisObj.state.ctx.strokeStyle = "#999";
-              break;
-            case "rail":
-              thisObj.state.ctx.strokeStyle = "#7de";
-              break;
-            default:
-              break;
-          }
-          thisObj.state.ctx.stroke(path);
-        } else if (thisObj.props.type == "vectiles-water-areas"){
-          thisObj.state.ctx.fillStyle = "#E9FBFF";
-          thisObj.state.ctx.fill(path);
-        }
+        paths.push([path, thisObj.props.type, name.properties.kind, thisObj.props.ctx]);
       }); 
+ 
+     thisObj.props.renderQ.add(paths);
     }
     
     return (null)
@@ -109,7 +91,35 @@ var Tile = React.createClass({
 
 var BackgroundLayer = React.createClass({
   getInitialState:function(){
-    return { ctx:null }
+
+    var renderTile = function(options){
+      if(options[1] == "vectiles-highroad"){
+        switch(options[2]){
+          case "major_road":
+            options[3].strokeStyle = "#aaa";
+            break;
+          case "minor_road":
+            options[3].strokeStyle = "#ddd";
+            break;
+          case "highway":
+          case "bridge":
+            options[3].strokeStyle = "#999";
+            break;
+          case "rail":
+            options[3].strokeStyle = "#7de";
+            break;
+          default:
+            break;
+        }
+        options[3].stroke(options[0]);
+      } else if (options[1] == "vectiles-water-areas"){
+        options[3].fillStyle = "#E9FBFF";
+        options[3].fill(options[0]);
+      }
+    };
+
+    var renderObj = renderQueue(renderTile);
+    return { ctx:null, renderQ:renderObj }
   },
 
   componentDidMount:function(){
@@ -122,13 +132,16 @@ var BackgroundLayer = React.createClass({
     var tiles = [],
         thisObj = this;
 
-    if(this.state.ctx) this.state.ctx.clearRect(0,0,this.props.width,this.props.height);
+    if(this.state.ctx && this.props.tiles){
+      this.state.renderQ.init();
+      this.state.ctx.clearRect(0,0,this.props.width,this.props.height);
 
-    for(key in this.props.tiles){
-      if(thisObj.props.tiles[key].length > 2) {
-        tiles.push(<Tile type={this.props.type} path={thisObj.props.path} data={thisObj.props.tiles[key]} id={this.props.id} width={this.props.width} height={this.props.height}></Tile>);
-      }
-    };
+      for(key in this.props.tiles){
+        if(thisObj.props.tiles[key].length > 2) {
+          tiles.push(<Tile type={thisObj.props.type} ctx={thisObj.state.ctx} renderQ={thisObj.state.renderQ} path={thisObj.props.path} data={thisObj.props.tiles[key]} id={this.props.id} width={this.props.width} height={this.props.height}></Tile>);
+        }
+      };
+    }
 
     return (
         <canvas 
@@ -144,34 +157,32 @@ var BackgroundLayer = React.createClass({
 
 var Map = React.createClass({
     getInitialState:function(){
-
+      var tilerObj = d3geotile()
+        .size([this.props.width, this.props.height]);
+      
       var zoomBehavior = d3.behavior.zoom()
-        .scale((1 << 18) / 2 / Math.PI)
-        .scaleExtent([((1 << 16)), ((1 << 20))])
+        .scale((1 << 18))
+        .scaleExtent([1 << 10, 1 << 30])
         .translate([this.props.width / 2, this.props.height / 2])
         .on("zoom", this.zoomed);
 
       var projection = d3.geo.mercator()
-        .center([-77.0365298, 38.8976763])
         .scale(zoomBehavior.scale())
-        .translate(zoomBehavior.translate());
+        .translate(zoomBehavior.translate())
+        .center([-77.0365298, 38.8976763]);
+
+      var tileProjection = d3.geo.mercator();
+      
 
       var calcPath = d3.geo.path()
         .projection(projection);
 
-      var tilerObj = d3geotile()
-        .size([this.props.width, this.props.height])
-        .scale(projection.scale() * 2 * Math.PI)
-        .translate(projection([0, 0]));
 
-      // Array of information for tiles
-      var tilesArray = tilerObj(0);
-      
       return {
-        path: calcPath,
         projection: projection,
+        path: calcPath,
         tiler: tilerObj,
-        tiles: tilesArray,
+        tiles: null,
         zoom: zoomBehavior,
         className: "map-wrapper"
       }
@@ -179,21 +190,28 @@ var Map = React.createClass({
 
     zoomed:function(){
       var zoom = this.state.zoom;
-
-      this.state.projection
-        .scale(zoom.scale())
+      
+      var proj = this.state.projection;
+      proj
+        .scale(zoom.scale() / 2 / Math.PI)
         .translate(zoom.translate());
-
-      this.state.tiler
-        .scale(this.state.projection.scale() * 2 * Math.PI)
-        .translate(this.state.projection([0, 0]));
-
-      var tilesArray = this.state.tiler(0);
+      
+      var tilerObj = this.state.tiler;
+      var tilesArray= tilerObj
+        .scale(zoom.scale())
+        .translate(proj([0,0]))
+        ();
 
       this.setState({
-        tiles: tilesArray
+        tiles: tilesArray,
+        tiler: tilerObj,
+        projection: proj
       })
 
+    },
+
+    componentWillMount:function(){
+      this.zoomed();
     },
 
     componentDidMount:function(){
