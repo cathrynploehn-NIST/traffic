@@ -28394,6 +28394,12 @@ var topojson = require('topojson');
 var d3geotile = require('d3.geo.tile');
 var renderQueue = require('../util/renderqueue.js')
 
+var roadStyles = {
+    "major_road": { color: "#555", width: 1.4 },
+    "minor_road": { color: "#aaa", width: 0.8 },
+    "highway":    { color: "#222", width: 1.8 }
+  };
+
 var Overlay = React.createClass({displayName: 'Overlay',
   getInitialState:function(){
     return {
@@ -28438,98 +28444,114 @@ var Overlay = React.createClass({displayName: 'Overlay',
   }
 });
 
-var Tile = React.createClass({displayName: 'Tile',
-  getInitialState:function(){
-    return {features: null};
-  },
-
-  componentDidMount:function(){
-    var thisObj = this,
-          d = this.props.data;
-
-    this.xhr = d3.json("http://" + ["a", "b", "c"][(d[0] * 31 + d[1]) % 3] + ".tile.openstreetmap.us/"+thisObj.props.type+"/" + d[2] + "/" + d[0] + "/" + d[1] + ".json", function(error, json) {
-      if (error) return console.error(error);
-      var featuresObj = json.features.sort(function(a, b) { return a.properties.sort_key - b.properties.sort_key; });
-      thisObj.setState({ 
-        features: featuresObj,
-      });
-    }.bind(this));
-  },
-
-  componentWillUnmount: function(){
-    this.xhr.abort();
-  },
-
-  render: function(){
-    var paths = [],
-      thisObj = this;
-
-    if (thisObj.state.features) {
-      thisObj.state.features.forEach(function(name){ 
-        dVal = thisObj.props.path(name.geometry);
-        var path = new Path2D(dVal);
-        paths.push([path, thisObj.props.type, name.properties.kind, thisObj.props.ctx]);
-      }); 
- 
-     thisObj.props.renderQ.add(paths);
-    }
-    
-    return (null)
-  }
-});
-
 var BackgroundLayer = React.createClass({displayName: 'BackgroundLayer',
-  getInitialState:function(){
+  groupByKind:function(data){
+    return data.reduce(function(memo, d) {
+      var kind = d.properties.kind;
+      if (memo[kind]) { memo[kind].push(d); }
+      else            { memo[kind] = [ d ]; }
+      return memo;
+    }, {});
+  },
 
-    var renderTile = function(options){
-      if(options[1] == "vectiles-highroad"){
-        switch(options[2]){
-          case "major_road":
-            options[3].strokeStyle = "#aaa";
-            break;
-          case "minor_road":
-            options[3].strokeStyle = "#ddd";
-            break;
-          case "highway":
-          case "bridge":
-            options[3].strokeStyle = "#999";
-            break;
-          case "rail":
-            options[3].strokeStyle = "#7de";
-            break;
-          default:
-            break;
-        }
-        options[3].stroke(options[0]);
-      } else if (options[1] == "vectiles-water-areas"){
-        options[3].fillStyle = "#E9FBFF";
-        options[3].fill(options[0]);
+  drawTile:function(tiles, d, data){
+    var thisObj = this;
+    console.log(tiles);
+    console.log(d);
+    console.log(data);
+    var k = Math.pow(2, d[2]) * 256;
+    var x = (d[0] + tiles.translate[0]) * tiles.scale;
+    var y = (d[1] + tiles.translate[1]) * tiles.scale;
+    var s = tiles.scale / 256;
+
+    this.state.path
+      .projection()
+      .translate([ k / 2 - d[0] * 256, k / 2 - d[1] * 256 ])
+      .scale(k / 2 / Math.PI);
+    this.state.ctx.save();
+    this.state.ctx.translate(x, y);
+    this.state.ctx.scale(s, s);
+
+    for (key in data) {
+      var style = roadStyles[key];
+      
+      if (style) {
+
+        thisObj.state.ctx.beginPath();
+        data[key].forEach(thisObj.state.path);
+        thisObj.state.ctx.closePath();
+        thisObj.state.ctx.strokeStyle = style.color;
+        thisObj.state.ctx.lineWidth = style.width;
+        thisObj.state.ctx.stroke();
+
       }
-    };
+    }
 
-    var renderObj = renderQueue(renderTile);
-    return { ctx:null, renderQ:renderObj }
+    thisObj.state.ctx.restore();
+
+  },
+
+  zoomed: function() {
+    var thisObj = this;
+    // this.state.renderQ.init();
+    this.state.ctx.clearRect(0,0,this.props.width,this.props.height);
+
+    this.props.tiles.forEach(function(d){
+      // create url
+      var letters = [ "a", "b", "c" ];
+      var letter = letters[(d[0] * 31 + d[1]) % 3];
+      var url = "http://" + letter + ".tile.openstreetmap.us/" + thisObj.props.type + "/" + d[2] + "/" + d[0] + "/" + d[1] + ".json";
+
+      // check cached
+      if (thisObj.state.cachedTiles[url] && thisObj.state.cachedTiles[url].caching === false && thisObj.state.cachedTiles[url].drawing === false) {
+
+        thisObj.drawTile(thisObj.props.tiles, d, thisObj.state.cachedTiles[url].data);
+
+      } else if (!thisObj.state.cachedTiles[url]) {
+
+        thisObj.state.cachedTiles[url] = { caching: true, drawing: false, data: [] };
+
+        d3.json(url, function(error, json) {
+          if (error) {
+            console.error("caching tiles error", error, url, json);
+            delete cachedTiles[url];
+
+          }
+          else {
+
+            var data = json.features.sort(function(a, b) {
+              return a.properties.sort_key - b.properties.sort_key;
+            });
+            console.log(data)
+            thisObj.state.cachedTiles[url] = { caching: false, drawing: true, data: thisObj.groupByKind(data) };
+
+            thisObj.drawTile(thisObj.props.tiles, d, thisObj.state.cachedTiles[url].data);
+
+            thisObj.state.cachedTiles[url].drawing = false;
+
+          }
+        });
+      }
+    });
+  },
+  
+  getInitialState:function(){
+    var renderObj = renderQueue(this.drawTile);
+    return { ctx:null, renderQ:renderObj, cachedTiles: {}, path: null }
   },
 
   componentDidMount:function(){
     var canvas = document.getElementById(this.props.id),
       ctxObj = canvas.getContext('2d');
-    this.setState({ ctx: ctxObj });
+    var tilePath = d3.geo.path()
+    .projection(d3.geo.mercator())
+    .context(ctxObj);
+    this.setState({ ctx: ctxObj, path: tilePath });
   },
 
   render:function(){
-    var tiles = [],
-        thisObj = this;
-
     if(this.state.ctx && this.props.tiles){
-      this.state.renderQ.init();
-      this.state.ctx.clearRect(0,0,this.props.width,this.props.height);
-
-      for(key in this.props.tiles){
-        if(thisObj.props.tiles[key].length > 2) {
-          tiles.push(Tile({type: thisObj.props.type, ctx: thisObj.state.ctx, renderQ: thisObj.state.renderQ, path: thisObj.props.path, data: thisObj.props.tiles[key], id: this.props.id, width: this.props.width, height: this.props.height}));
-        }
-      };
+      this.zoomed();
     }
 
     return (
@@ -28537,8 +28559,7 @@ var BackgroundLayer = React.createClass({displayName: 'BackgroundLayer',
           width: this.props.width, 
           height: this.props.height, 
           className: this.props.id, 
-          id: this.props.id}, 
-            tiles
+          id: this.props.id}
         )     
     )
   }
@@ -28546,31 +28567,31 @@ var BackgroundLayer = React.createClass({displayName: 'BackgroundLayer',
 
 var Map = React.createClass({displayName: 'Map',
     getInitialState:function(){
-      var tilerObj = d3geotile()
+      var thisObj = this;
+      var tile = d3geotile()
         .size([this.props.width, this.props.height]);
       
-      var zoomBehavior = d3.behavior.zoom()
-        .scale((1 << 18))
-        .scaleExtent([1 << 10, 1 << 30])
-        .translate([this.props.width / 2, this.props.height / 2])
-        .on("zoom", this.zoomed);
+      // var center = [-74.1, 39.94];
+      var center = [-77.0365298, 38.8976763];
 
       var projection = d3.geo.mercator()
-        .scale(zoomBehavior.scale())
-        .translate(zoomBehavior.translate())
-        .center([-77.0365298, 38.8976763]);
+        .scale((1 << 22) / 2 / Math.PI)
+        .translate([-(this.props.width) / 2, -(this.props.height) / 2]);  
 
-      var tileProjection = d3.geo.mercator();
-      
+      var zoomBehavior = d3.behavior.zoom()
+        .scale(projection.scale() * 2 * Math.PI)
+        .scaleExtent([1 << 18, 1 << 26])
+        .size([this.props.width, this.props.height])
+        .translate(projection(center).map(function(x) { return -x; }))
+        .on("zoom", thisObj.zoomed);
 
-      var calcPath = d3.geo.path()
-        .projection(projection);
-
+      var tilePath = d3.geo.path()
+        .projection(d3.geo.mercator());
 
       return {
         projection: projection,
-        path: calcPath,
-        tiler: tilerObj,
+        path: tilePath,
+        tile: tile,
         tiles: null,
         zoom: zoomBehavior,
         className: "map-wrapper"
@@ -28578,23 +28599,14 @@ var Map = React.createClass({displayName: 'Map',
     },
 
     zoomed:function(){
-      var zoom = this.state.zoom;
-      
-      var proj = this.state.projection;
-      proj
-        .scale(zoom.scale() / 2 / Math.PI)
-        .translate(zoom.translate());
-      
-      var tilerObj = this.state.tiler;
-      var tilesArray= tilerObj
-        .scale(zoom.scale())
-        .translate(proj([0,0]))
-        ();
+
+      var tilesArray= this.state.tile
+        .scale(this.state.zoom.scale())
+        .translate(this.state.zoom.translate())
+        .call();
 
       this.setState({
         tiles: tilesArray,
-        tiler: tilerObj,
-        projection: proj
       })
 
     },
@@ -28633,6 +28645,7 @@ var Map = React.createClass({displayName: 'Map',
             height: this.props.height, 
             tiles: this.state.tiles, 
             path: this.state.path, 
+            zoom: this.state.zoom, 
             id: "roadTiles", 
             type: "vectiles-highroad"
           }
@@ -28642,6 +28655,7 @@ var Map = React.createClass({displayName: 'Map',
             height: this.props.height, 
             tiles: this.state.tiles, 
             path: this.state.path, 
+            zoom: this.state.zoom, 
             id: "waterTiles", 
             type: "vectiles-water-areas"
           }
