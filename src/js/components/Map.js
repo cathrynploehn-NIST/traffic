@@ -5,11 +5,15 @@ var topojson = require('topojson');
 var d3geotile = require('d3.geo.tile');
 var renderQueue = require('../util/renderqueue.js')
 
-var roadStyles = {
+var styles = {
+  "vectiles-highroad": {
     "major_road": { color: "#555", width: 1.4 },
     "minor_road": { color: "#aaa", width: 0.8 },
-    "highway":    { color: "#222", width: 1.8 }
-  };
+    "highway":    { color: "#222", width: 1.8 },
+    "rail": { color: "#000", width: 1.8}
+  },
+  "vectiles-water-areas" : {color: "#C6E1FF"}
+};
 
 var Overlay = React.createClass({
   getInitialState:function(){
@@ -67,9 +71,7 @@ var BackgroundLayer = React.createClass({
 
   drawTile:function(tiles, d, data){
     var thisObj = this;
-    console.log(tiles);
-    console.log(d);
-    console.log(data);
+
     var k = Math.pow(2, d[2]) * 256;
     var x = (d[0] + tiles.translate[0]) * tiles.scale;
     var y = (d[1] + tiles.translate[1]) * tiles.scale;
@@ -84,16 +86,22 @@ var BackgroundLayer = React.createClass({
     this.state.ctx.scale(s, s);
 
     for (key in data) {
-      var style = roadStyles[key];
+      var style = styles[thisObj.props.type];
       
       if (style) {
 
         thisObj.state.ctx.beginPath();
         data[key].forEach(thisObj.state.path);
         thisObj.state.ctx.closePath();
-        thisObj.state.ctx.strokeStyle = style.color;
-        thisObj.state.ctx.lineWidth = style.width;
-        thisObj.state.ctx.stroke();
+        if(thisObj.props.type == "vectiles-highroad"){
+          console.log(key);
+          thisObj.state.ctx.strokeStyle = style[key].color;
+          thisObj.state.ctx.lineWidth = style[key].width;
+          thisObj.state.ctx.stroke();
+        } else {
+          thisObj.state.ctx.fillStyle = style.color;
+          thisObj.state.ctx.fill();
+        }
 
       }
     }
@@ -104,7 +112,7 @@ var BackgroundLayer = React.createClass({
 
   zoomed: function() {
     var thisObj = this;
-    // this.state.renderQ.init();
+    this.state.renderQ.init();
     this.state.ctx.clearRect(0,0,this.props.width,this.props.height);
 
     this.props.tiles.forEach(function(d){
@@ -133,7 +141,7 @@ var BackgroundLayer = React.createClass({
             var data = json.features.sort(function(a, b) {
               return a.properties.sort_key - b.properties.sort_key;
             });
-            console.log(data)
+
             thisObj.state.cachedTiles[url] = { caching: false, drawing: true, data: thisObj.groupByKind(data) };
 
             thisObj.drawTile(thisObj.props.tiles, d, thisObj.state.cachedTiles[url].data);
