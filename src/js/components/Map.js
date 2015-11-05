@@ -5,62 +5,72 @@ var topojson = require('topojson');
 var d3geotile = require('d3.geo.tile');
 var renderQueue = require('../util/renderqueue.js')
 
+var overlayTypes = {
+    "detectors" : { location: "data/detector_inventory.csv", color: "#083283", radius: 3 },
+    "cameras" : { location: "data/camera_inventory.csv", color: "#8073E9", radius: 2 },
+    "events" : { location: "data/events_training.csv", color: "#F9210C", radius: 1}
+};
+
 // Colors for map
-var styles = {
+var backgroundLayerTypes = {
   "vectiles-highroad": {
-    "major_road": { color: "#555", width: 1.4 },
+    "major_road": { color: "#999", width: 1.4 },
     "minor_road": { color: "#aaa", width: 0.8 },
-    "path": { color: "#aaa", width: 0.8 },
-    "highway":    { color: "#222", width: 1.8 },
+    "path": { color: "#ccc", width: 0.8 },
+    "highway":    { color: "#888", width: 1.8 },
     "rail": { color: "#3E001F", width: 1.8}
   },
   "vectiles-water-areas" : {color: "#C6E1FF"}
 };
 
-var overlayTypes = {
-    "detectors" : { location: "data/detector_inventory.csv" }
-};
 
 
 var Overlay = React.createClass({
-    getInitialState:function(){ return { data: null, radius: 5 } },
+    getInitialState:function(){ 
+        var renderObj = renderQueue(this.draw);
+        return { data: null, radius: overlayTypes[this.props.type].radius, renderQ: renderObj } 
+    },
 
     componentDidMount:function(){
         var thisObj = this,
             canvas = document.getElementById(this.props.type),
             ctxObj = canvas.getContext('2d');
 
-        d3.csv(overlayTypes[this.props.type].location, function(error, lane_detectors){
+        d3.csv(overlayTypes[this.props.type].location, function(error, data){
             thisObj.setState({
-                data: lane_detectors,
+                data: data,
                 ctx: ctxObj
             });
         });
     },
-
-  render:function(){    
-    if( this.state.ctx && this.state.data ){
-      this.state.ctx.clearRect ( 0, 0, this.props.width, this.props.height );
-
-      for( key in this.state.data ){
-        var longitude = +this.state.data[key].longitude,
-            latitude = +this.state.data[key].latitude,
+    
+    draw:function(datum){
+        var longitude = +datum.longitude,
+            latitude = +datum.latitude,
             translate = this.props.projection([longitude, latitude]);
 
+        this.state.ctx.fillStyle = overlayTypes[this.props.type].color;
         this.state.ctx.beginPath();
         this.state.ctx.arc(translate[0],translate[1],this.state.radius,0,Math.PI*2,true); 
         this.state.ctx.fill();
-      }
-    }
+    },
 
-    return (
-        <canvas 
-            width={this.props.width}
-            height={this.props.height}
-            className={this.props.type} 
-            id={this.props.type}>      
-        </canvas>
-    )
+    render:function(){    
+        if( this.state.ctx && this.state.data ){
+            this.state.renderQ.init();
+            this.state.ctx.clearRect ( 0, 0, this.props.width, this.props.height );
+
+            this.state.renderQ.add(this.state.data);
+        }
+
+        return (
+            <canvas 
+                width={this.props.width}
+                height={this.props.height}
+                className={this.props.type} 
+                id={this.props.type}>      
+            </canvas>
+        )
   }
 });
 
@@ -90,7 +100,7 @@ var BackgroundLayer = React.createClass({
     this.state.ctx.scale(s, s);
 
     for (key in data) {
-        var style = styles[thisObj.props.type];
+        var style = backgroundLayerTypes[thisObj.props.type];
 
         if (style) {
 
@@ -197,7 +207,7 @@ var Map = React.createClass({
       // var center = [-96.65447, 33.03357]; // Dallas
 
       var projection = d3.geo.mercator()
-        .scale((1 << 18) / 2 / Math.PI)
+        .scale((1 << 20) / 2 / Math.PI)
         .translate([-(this.props.width) / 2, -(this.props.height) / 2]);  
 
       var zoomBehavior = d3.behavior.zoom()
@@ -246,7 +256,7 @@ var Map = React.createClass({
 
     render:function(){
         var thisObj = this, 
-            backgroundLayerTypes = ["vectiles-highroad", "vectiles-water-areas"],
+            // backgroundLayerTypes = ["vectiles-highroad", "vectiles-water-areas"],
             backgroundLayers = [],
             overlays = [];
 
@@ -256,7 +266,7 @@ var Map = React.createClass({
                 width={thisObj.props.width}
                 height={thisObj.props.height}
                 tiles={thisObj.state.tiles}
-                type={backgroundLayerTypes[layer]} >
+                type={layer} >
               </BackgroundLayer>
             )
         }

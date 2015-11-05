@@ -1,6 +1,6 @@
 var renderQueue = (function(func) {
   var _queue = [],                  // data to be rendered
-      _rate = 500,                 // number of calls per frame
+      _rate = 1000,                 // number of calls per frame, max 1,000
       _invalidate = function() {},  // invalidate last render queue
       _clear = function() {};       // clearing function
 
