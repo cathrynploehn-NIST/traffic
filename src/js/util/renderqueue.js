@@ -1,11 +1,15 @@
 var renderQueue = (function(func) {
   var _queue = [],                  // data to be rendered
-      _rate = 1000,                 // number of calls per frame
+      _rate = 1000,                 // number of calls per frame, max 1,000
       _invalidate = function() {},  // invalidate last render queue
       _clear = function() {};       // clearing function
 
   var rq = function(data) {
-    if (data) rq.data(data);
+    rq.init(data);
+  };
+
+  rq.init = function(data) {
+    rq.data(data);
     _invalidate();
     _clear();
     rq.render();
@@ -28,13 +32,21 @@ var renderQueue = (function(func) {
   };
 
   rq.data = function(data) {
-    _invalidate();
-    _queue = data.slice(0);   // creates a copy of the data
+    if(data) {
+      _invalidate();
+      _queue = data.slice(0);   // creates a copy of the data
+    } else {
+      _queue = [];
+    }
     return rq;
   };
 
   rq.add = function(data) {
-    _queue = _queue.concat(data);
+    if(_queue) {
+      _queue = _queue.concat(data);
+    } else {
+      rq.init(data);
+    }
   };
 
   rq.rate = function(value) {
@@ -67,4 +79,8 @@ var renderQueue = (function(func) {
     || function(callback) { setTimeout(callback, 17); };
 
   return rq;
+
 });
+
+module.exports = renderQueue;
+
