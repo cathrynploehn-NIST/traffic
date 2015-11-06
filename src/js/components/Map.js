@@ -3,7 +3,8 @@ var React = require('react');
 var d3 = require('d3');
 var topojson = require('topojson');
 var d3geotile = require('d3.geo.tile');
-var renderQueue = require('../util/renderqueue.js')
+var renderQueue = require('../util/renderqueue.js');
+var $ = require('jquery');
 
 var overlayTypes = {
     "detectors" : { location: "data/detector_inventory.csv", color: "#083283", radius: 3 },
@@ -18,32 +19,69 @@ var backgroundLayerTypes = {
     "minor_road": { color: "#aaa", width: 0.8 },
     "path": { color: "#ccc", width: 0.8 },
     "highway":    { color: "#888", width: 1.8 },
-    "rail": { color: "#3E001F", width: 1.8}
+    "rail": { color: "#00F", width: 3}
   },
   "vectiles-water-areas" : {color: "#C6E1FF"}
 };
 
-
-
 var Overlay = React.createClass({
+    handleMouseMove:function(e){
+        mouseX = parseInt(e.clientX - this.state.canvasOffset.left);
+        mouseY = parseInt(e.clientY - this.state.canvasOffset.top);
+        var dx = mouseX - myCircle.x;
+        var dy = mouseY - myCircle.y;
+
+        // math to test if mouse is inside circle
+        if (dx * dx + dy * dy < myCircle.rr) {
+
+            // change to hovercolor if previously outside
+            if (!myCircle.isHovering) {
+                myCircle.isHovering = true;
+                drawCircle(myCircle);
+            }
+
+        } else {
+
+            // change to blurcolor if previously inside
+            if (myCircle.isHovering) {
+                myCircle.isHovering = false;
+                drawCircle(myCircle);
+            }
+        }
+    },
+
     getInitialState:function(){ 
         var renderObj = renderQueue(this.draw);
-        return { data: null, radius: overlayTypes[this.props.type].radius, renderQ: renderObj } 
+        var radius2 = overlayTypes[this.props.type].radius * overlayTypes[this.props.type].radius; 
+        return { data: null, radius: overlayTypes[this.props.type].radius, radius2: radius2, renderQ: renderObj, currentNodes: {}, canvasOffset: null } 
+    },
+
+    componentWillMount:function(){
+        this.setState({ currentNodes: {} });
     },
 
     componentDidMount:function(){
         var thisObj = this,
+            id = "#" + this.props.type,
             canvas = document.getElementById(this.props.type),
             ctxObj = canvas.getContext('2d');
 
+        var canvasOffset = $(id).offset();
+
+        $(id).mousemove(function (e) {
+            thisObj.handleMouseMove(e);
+        });
+  
         d3.csv(overlayTypes[this.props.type].location, function(error, data){
             thisObj.setState({
                 data: data,
-                ctx: ctxObj
+                ctx: ctxObj,
+                canvasOffset: canvasOffset
             });
         });
     },
     
+
     draw:function(datum){
         var longitude = +datum.longitude,
             latitude = +datum.latitude,
@@ -53,6 +91,12 @@ var Overlay = React.createClass({
         this.state.ctx.beginPath();
         this.state.ctx.arc(translate[0],translate[1],this.state.radius,0,Math.PI*2,true); 
         this.state.ctx.fill();
+
+        var x = "x"+translate[0],
+            y = "y"+translate[1];
+
+        this.state.currentNodes[x] = translate[0];
+        this.state.currentNodes[y] = translate[1];
     },
 
     render:function(){    
