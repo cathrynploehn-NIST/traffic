@@ -79,6 +79,8 @@ var renderQueue = (function(func) {
     || function(callback) { setTimeout(callback, 17); };
 
   return rq;
+
 });
 
 module.exports = renderQueue;
+

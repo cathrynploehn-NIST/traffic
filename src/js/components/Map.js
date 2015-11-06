@@ -24,6 +24,7 @@ var backgroundLayerTypes = {
   "vectiles-water-areas" : {color: "#C6E1FF"}
 };
 
+
 var Overlay = React.createClass({
     handleMouseMove:function(e){
         mouseX = parseInt(e.clientX - this.state.canvasOffset.left);

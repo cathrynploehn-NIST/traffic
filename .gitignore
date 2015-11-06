@@ -27,3 +27,5 @@ node_modules
 
 # data
 dist/data
+
+node_modules/
