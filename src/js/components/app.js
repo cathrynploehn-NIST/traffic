@@ -1,19 +1,7 @@
 /** @jsx React.DOM */
 var React = require('react');
 var Map = require('../components/Map.js');
-
-var Graph = React.createClass({
-    render:function(){
-      return (
-        <div>
-          <Map 
-            width={this.props.width}
-            height={this.props.height}
-          ></Map>       
-        </div>
-      )
-    }
-  });
+var Bar = require('../components/Bar.js');
 
 var App = React.createClass({
     getDefaultProps: function() {
@@ -26,11 +14,10 @@ var App = React.createClass({
     render:function(){
       return (
         <div className="wrapper">
-          <Graph 
+          <Map 
             width={this.props.width}
-            height={this.props.height} 
-          >
-          </Graph> 
+            height={this.props.height}
+          ></Map>
         </div>
       )
     }
