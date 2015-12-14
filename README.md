@@ -1,20 +1,6 @@
-# React Flux Simple App
+# React map and bar chart components (D3 + Canvas)
 
-This is the simples possible App that I can think of that implements the React framework on top of the Flux architecture.
+You will need __npm__ and __nodejs__ to run.
 
-## Installation
-
-    git clone git@github.com:bengrunfeld/react-flux-simple-app.git
-    cd react-flux-simple-app
-    npm install
-    gulp
-
-## Usage
-
-* Open up `dist/index.html` in Chrome
-* Hit `Cmd + Option + j` to bring up the Dev Tools window
-* Click on the text in the UI and you'll see the log show up in the console.
-
-## Questions
-
-For any question about Flux, hit me up on Twitter at: [@bengrunfeld](https://twitter.com/bengrunfeld)
+1. Install components with: `npm install`
+2. Run with the command: `gulp`
