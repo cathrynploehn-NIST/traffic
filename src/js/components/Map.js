@@ -7,7 +7,7 @@ var renderQueue = require('../util/renderqueue.js');
 var $ = require('jquery');
 
 var overlayTypes = {
-    "detectors" : { location: "data/detector_inventory.csv", color: "#083283", radius: 3 },
+    // "detectors" : { location: "data/detector_inventory.csv", color: "#083283", radius: 3 },
     "cameras" : { location: "data/camera_inventory.csv", color: "#8073E9", radius: 2 },
     "events" : { location: "data/events_training.csv", color: "#F9210C", radius: 1}
 };
@@ -26,30 +26,6 @@ var backgroundLayerTypes = {
 
 
 var Overlay = React.createClass({
-    handleMouseMove:function(e){
-        mouseX = parseInt(e.clientX - this.state.canvasOffset.left);
-        mouseY = parseInt(e.clientY - this.state.canvasOffset.top);
-        var dx = mouseX - myCircle.x;
-        var dy = mouseY - myCircle.y;
-
-        // math to test if mouse is inside circle
-        if (dx * dx + dy * dy < myCircle.rr) {
-
-            // change to hovercolor if previously outside
-            if (!myCircle.isHovering) {
-                myCircle.isHovering = true;
-                drawCircle(myCircle);
-            }
-
-        } else {
-
-            // change to blurcolor if previously inside
-            if (myCircle.isHovering) {
-                myCircle.isHovering = false;
-                drawCircle(myCircle);
-            }
-        }
-    },
 
     getInitialState:function(){ 
         var renderObj = renderQueue(this.draw);
@@ -68,12 +44,9 @@ var Overlay = React.createClass({
             ctxObj = canvas.getContext('2d');
 
         var canvasOffset = $(id).offset();
-
-        $(id).mousemove(function (e) {
-            thisObj.handleMouseMove(e);
-        });
   
         d3.csv(overlayTypes[this.props.type].location, function(error, data){
+            console.log(data);
             thisObj.setState({
                 data: data,
                 ctx: ctxObj,
@@ -171,9 +144,8 @@ var BackgroundLayer = React.createClass({
     thisObj.state.ctx.restore();
   },
 
-  zoomed: function() {
+  drawCanvas: function() {
     var thisObj = this;
-    this.state.renderQ.init();
     this.state.ctx.clearRect(0,0,this.props.width,this.props.height);
 
     this.props.tiles.forEach(function(d){
@@ -215,8 +187,7 @@ var BackgroundLayer = React.createClass({
   },
   
   getInitialState:function(){
-    var renderObj = renderQueue(this.drawTile);
-    return { ctx:null, renderQ:renderObj, cachedTiles: {}, path: null }
+    return { ctx:null, cachedTiles: {}, path: null }
   },
 
   componentDidMount:function(){
@@ -230,7 +201,7 @@ var BackgroundLayer = React.createClass({
 
   render:function(){
     if(this.state.ctx && this.props.tiles){
-      this.zoomed();
+      this.drawCanvas();
     }
 
     return (
@@ -301,7 +272,6 @@ var Map = React.createClass({
 
     render:function(){
         var thisObj = this, 
-            // backgroundLayerTypes = ["vectiles-highroad", "vectiles-water-areas"],
             backgroundLayers = [],
             overlays = [];
 
