@@ -2,6 +2,7 @@
 var React = require('react');
 var Bar = require('../components/Bar.js');
 var Map = require('../components/Map.js');
+var Bar = require('../components/Bar.js');
 
 var App = React.createClass({
     getDefaultProps: function() {
