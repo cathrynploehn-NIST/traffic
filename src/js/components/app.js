@@ -1,6 +1,7 @@
 /** @jsx React.DOM */
 var React = require('react');
 var Bar = require('../components/Bar.js');
+var Map = require('../components/Map.js');
 
 var App = React.createClass({
     getDefaultProps: function() {
@@ -31,7 +32,7 @@ var App = React.createClass({
             yAxisName="weight (kg)"
             xAxisName="name"
           >
-          </Bar> 
+          </Bar>
         </div>
       )
     }
