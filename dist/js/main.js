@@ -37602,13 +37602,195 @@ module.exports = require('./lib/React');
 /** @jsx React.DOM */
 var React = require('react');
 var d3 = require('d3');
+var renderQueue = require('../util/renderqueue.js');
+var $ = require('jquery');
+
+var Bar = React.createClass({displayName: 'Bar',
+	
+	propTypes:{
+		width: React.PropTypes.number.isRequired,
+		height: React.PropTypes.number.isRequired,
+        type:React.PropTypes.string.isRequired, // id for the canvas element
+        title: React.PropTypes.string.isRequired,
+        yAxisName: React.PropTypes.string.isRequired,
+        xAxisName: React.PropTypes.string.isRequired,
+        data: React.PropTypes.array.isRequired
+	},
+
+    getInitialState:function(){
+    	var margin = {top: 20, right: 20, bottom: 20, left: 20},
+    		width = this.props.width - margin.left - margin.right,
+   	 		height = this.props.height - margin.top - margin.bottom;
+    		
+    	return { 
+            // Display properties
+    		yAxisPadding: 15,
+    		numberTicks: 3,
+            fontScale: 10, // Use scale to convert number of letters to actual pixels in 9pt courier font
+            margin:margin, 
+            width:width, 
+            height:height,
+            
+            x:null,
+            y:null, 
+            ctx:null, 
+            xAxisWidth: null,
+            yAxisWidth: null,
+            tickFormat: null,
+            yAxisTitle: null,
+            xAxisTitle: null,
+            maxTitleLength: null,
+            drawHeight: null,
+            drawWidth: null
+    	}
+    },
+
+    draw:function(){
+        var thisObj = this,
+            context = this.state.ctx,
+            yAxisName = this.props.yAxisName,
+            xAxisName = this.props.xAxisName;
+        context.font = "normal 9pt Courier";
+
+        /* x-tick labels */
+        context.save();
+        context.textAlign = "right";
+        context.textBaseline = "top";
+        this.state.x.domain().forEach(function(d) {
+            context.save();
+            context.translate(thisObj.state.x(d) + thisObj.state.yAxisWidth + (thisObj.state.x.rangeBand() / 3), (thisObj.state.height - thisObj.state.xAxisWidth + 6));
+            context.rotate(-Math.PI / 4);
+            context.fillText(d, 0 , 0);
+            context.restore();
+        });
+        context.restore();
+
+        /* y-ticks */
+        context.beginPath();
+        this.state.y.ticks(thisObj.state.numberTicks).forEach(function(d) {
+            context.moveTo(thisObj.state.yAxisWidth, thisObj.state.y(d));
+            context.lineTo((thisObj.state.yAxisWidth-6), thisObj.state.y(d));
+        });
+        context.strokeStyle = "black";
+        context.stroke();
+
+        /* y-tick labels */
+        context.textAlign = "right";
+        context.textBaseline = "middle";
+        this.state.y.ticks(thisObj.state.numberTicks).forEach(function(d) {
+            context.fillText(thisObj.state.tickFormat(d), (thisObj.state.yAxisWidth-9), (thisObj.state.y(d)));
+        });
+
+        /* y-axis */
+        // context.beginPath();
+        // context.lineTo((thisObj.state.yAxisWidth+0.5), 0);
+        // context.lineTo((thisObj.state.yAxisWidth+0.5), thisObj.state.drawHeight);
+        // context.strokeStyle = "black";
+        // context.stroke();
+
+        
+        /* y-axis title */
+		context.font = "bold 9pt Courier";
+        context.textAlign = "right";
+		context.textBaseline = "top";
+        for(key in thisObj.state.yAxisTitle){
+		  context.fillText(thisObj.state.yAxisTitle[key], (thisObj.state.maxTitleLength * thisObj.state.fontScale - thisObj.state.yAxisPadding), (key * thisObj.state.fontScale)-5 + (this.state.drawHeight/2));
+        }
+
+        /* x-axis title */
+        for(key in thisObj.state.xAxisTitle){
+          context.fillText(thisObj.state.xAxisTitle[key], (thisObj.state.maxTitleLength * thisObj.state.fontScale - thisObj.state.yAxisPadding), thisObj.state.height - (thisObj.state.xAxisWidth / 2));
+        }
+
+		/* bars */
+		context.fillStyle = "black";
+		this.props.data.forEach(function(d) {
+			context.fillRect(thisObj.state.x(d[xAxisName]) + thisObj.state.yAxisWidth, thisObj.state.y(d[yAxisName]), thisObj.state.x.rangeBand(), thisObj.state.drawHeight - thisObj.state.y(d[yAxisName]));
+		});
+    },
+    componentWillMount:function(){
+    	var thisObj = this,
+            yAxisName = this.props.yAxisName,
+            xAxisName = this.props.xAxisName;
+
+        // Determine X axis space
+        var xAxisWidth = d3.max(this.props.data, function(d){ return d[xAxisName].length; }) * (thisObj.state.fontScale/2);
+            xAxisWidth = Math.sqrt((xAxisWidth * xAxisWidth * 2));
+        
+        // Determine Y axis draw area
+        var drawHeight = this.state.height - xAxisWidth,
+            y = d3.scale.linear().rangeRound([drawHeight, 0]),
+            yAxisTitle = yAxisName.split(" "),
+            xAxisTitle = xAxisName.split(" "),
+            maxYTitleLength = d3.max(yAxisTitle, function(d){ return d.length; }),
+            maxXTitleLength = d3.max(xAxisTitle, function(d){ return d.length; }),
+            maxTitleLength = Math.max(maxYTitleLength, maxXTitleLength),
+
+        // Calculate ticks
+            ticks = y.ticks(thisObj.state.numberTicks),
+            tickFormat = y.tickFormat(d3.format("s")),
+
+        // Determine Y axis space
+            yAxisWidth = d3.max(ticks, function(d) { return tickFormat(d).length; }) + this.state.yAxisPadding + (maxYTitleLength * thisObj.state.fontScale),
+            drawWidth = this.state.width - yAxisWidth;
+
+        // Don't let bars be wider than 50px because it's ugly
+        if((this.state.width / thisObj.props.data.length) > 50){
+            var x = d3.scale.ordinal().rangeRoundBands([0, thisObj.props.data.length * 50], 0.02);
+        } else {
+            var x = d3.scale.ordinal().rangeRoundBands([0, this.state.width], 0.02);
+        }
+        
+    	x.domain(thisObj.props.data.map(function(d) { return d[xAxisName]; }));
+  		y.domain([0, d3.max(thisObj.props.data, function(d) { return d[yAxisName]; })]);
+
+    	this.setState({
+    		x: x,
+    		y: y,
+    		xAxisWidth: xAxisWidth,
+    		yAxisWidth: yAxisWidth,
+            yAxisTitle: yAxisTitle,
+            xAxisTitle: xAxisTitle,
+            maxTitleLength: maxTitleLength,
+    		tickFormat: tickFormat,
+    		drawHeight: drawHeight,
+    		drawWidth: drawWidth
+    	});
+
+    },
+    componentDidMount:function(){
+    	var canvas = document.getElementById(this.props.type),
+        	ctx = canvas.getContext('2d');
+    	ctx.translate(this.state.margin.left, this.state.margin.top);
+    	this.setState({ ctx:ctx });
+    },
+
+    render:function(){
+    	if(this.state.ctx && this.props.data) this.draw();
+        return (
+        	React.DOM.canvas({
+    			width: this.props.width, 
+                height: this.props.height, 
+                className: this.props.type, 
+                id: this.props.type}
+            )
+	    );
+    }
+
+});
+
+module.exports = Bar;
+},{"../util/renderqueue.js":156,"d3":2,"jquery":4,"react":150}],153:[function(require,module,exports){
+/** @jsx React.DOM */
+var React = require('react');
+var d3 = require('d3');
 var topojson = require('topojson');
 var d3geotile = require('d3.geo.tile');
 var renderQueue = require('../util/renderqueue.js');
 var $ = require('jquery');
 
 var overlayTypes = {
-    "detectors" : { location: "data/detector_inventory.csv", color: "#083283", radius: 3 },
+    // "detectors" : { location: "data/detector_inventory.csv", color: "#083283", radius: 3 },
     "cameras" : { location: "data/camera_inventory.csv", color: "#8073E9", radius: 2 },
     "events" : { location: "data/events_training.csv", color: "#F9210C", radius: 1}
 };
@@ -37627,30 +37809,6 @@ var backgroundLayerTypes = {
 
 
 var Overlay = React.createClass({displayName: 'Overlay',
-    handleMouseMove:function(e){
-        mouseX = parseInt(e.clientX - this.state.canvasOffset.left);
-        mouseY = parseInt(e.clientY - this.state.canvasOffset.top);
-        var dx = mouseX - myCircle.x;
-        var dy = mouseY - myCircle.y;
-
-        // math to test if mouse is inside circle
-        if (dx * dx + dy * dy < myCircle.rr) {
-
-            // change to hovercolor if previously outside
-            if (!myCircle.isHovering) {
-                myCircle.isHovering = true;
-                drawCircle(myCircle);
-            }
-
-        } else {
-
-            // change to blurcolor if previously inside
-            if (myCircle.isHovering) {
-                myCircle.isHovering = false;
-                drawCircle(myCircle);
-            }
-        }
-    },
 
     getInitialState:function(){ 
         var renderObj = renderQueue(this.draw);
@@ -37669,12 +37827,9 @@ var Overlay = React.createClass({displayName: 'Overlay',
             ctxObj = canvas.getContext('2d');
 
         var canvasOffset = $(id).offset();
-
-        $(id).mousemove(function (e) {
-            thisObj.handleMouseMove(e);
-        });
   
         d3.csv(overlayTypes[this.props.type].location, function(error, data){
+            console.log(data);
             thisObj.setState({
                 data: data,
                 ctx: ctxObj,
@@ -37772,9 +37927,8 @@ var BackgroundLayer = React.createClass({displayName: 'BackgroundLayer',
     thisObj.state.ctx.restore();
   },
 
-  zoomed: function() {
+  drawCanvas: function() {
     var thisObj = this;
-    this.state.renderQ.init();
     this.state.ctx.clearRect(0,0,this.props.width,this.props.height);
 
     this.props.tiles.forEach(function(d){
@@ -37816,8 +37970,7 @@ var BackgroundLayer = React.createClass({displayName: 'BackgroundLayer',
   },
   
   getInitialState:function(){
-    var renderObj = renderQueue(this.drawTile);
-    return { ctx:null, renderQ:renderObj, cachedTiles: {}, path: null }
+    return { ctx:null, cachedTiles: {}, path: null }
   },
 
   componentDidMount:function(){
@@ -37831,7 +37984,7 @@ var BackgroundLayer = React.createClass({displayName: 'BackgroundLayer',
 
   render:function(){
     if(this.state.ctx && this.props.tiles){
-      this.zoomed();
+      this.drawCanvas();
     }
 
     return (
@@ -37902,7 +38055,6 @@ var Map = React.createClass({displayName: 'Map',
 
     render:function(){
         var thisObj = this, 
-            // backgroundLayerTypes = ["vectiles-highroad", "vectiles-water-areas"],
             backgroundLayers = [],
             overlays = [];
 
@@ -37938,9 +38090,10 @@ var Map = React.createClass({displayName: 'Map',
 });
 
 module.exports = Map;
-},{"../util/renderqueue.js":155,"d3":2,"d3.geo.tile":1,"jquery":4,"react":150,"topojson":151}],153:[function(require,module,exports){
+},{"../util/renderqueue.js":156,"d3":2,"d3.geo.tile":1,"jquery":4,"react":150,"topojson":151}],154:[function(require,module,exports){
 /** @jsx React.DOM */
 var React = require('react');
+var Bar = require('../components/Bar.js');
 var Map = require('../components/Map.js');
 
 var App = React.createClass({displayName: 'App',
@@ -37948,16 +38101,24 @@ var App = React.createClass({displayName: 'App',
       return {
         width: window.innerWidth,
         height: window.innerHeight,
+        data: [
+            {"name": "Ashley", "weight (kg)": 12},
+            {"name": "Beezlebub", "weight (kg)": 20},
+            {"name": "Chad", "weight (kg)": 17},
+            {"name": "Dolores", "weight (kg)": 4},
+            {"name": "El Borrachito", "weight (kg)": 7},
+            {"name": "Flip", "weight (kg)": 1}
+        ]
       }
     },
 
     render:function(){
       return (
         React.DOM.div({className: "wrapper"}, 
-          Map({
-            width: this.props.width, 
-            height: this.props.height
-          })
+          Map(null, 
+            "width=", this.props.width, 
+            "height=", this.props.height
+          )
         )
       )
     }
@@ -37965,7 +38126,7 @@ var App = React.createClass({displayName: 'App',
 
 module.exports = App;
 
-},{"../components/Map.js":152,"react":150}],154:[function(require,module,exports){
+},{"../components/Bar.js":152,"../components/Map.js":153,"react":150}],155:[function(require,module,exports){
 /** @jsx React.DOM */
 var React = require('react');
 
@@ -37975,7 +38136,7 @@ var App = require('./components/app.js');
 
 React.render(App(null),document.getElementById('main'));
 
-},{"./components/app.js":153,"react":150}],155:[function(require,module,exports){
+},{"./components/app.js":154,"react":150}],156:[function(require,module,exports){
 var renderQueue = (function(func) {
   var _queue = [],                  // data to be rendered
       _rate = 1000,                 // number of calls per frame, max 1,000
@@ -38063,4 +38224,4 @@ var renderQueue = (function(func) {
 module.exports = renderQueue;
 
 
-},{}]},{},[154])
+},{}]},{},[155])
