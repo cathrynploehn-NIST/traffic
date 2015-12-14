@@ -38100,7 +38100,7 @@ var App = React.createClass({displayName: 'App',
     getDefaultProps: function() {
       return {
         width: window.innerWidth,
-        height: 500,
+        height: window.innerHeight,
         data: [
             {"name": "Ashley", "weight (kg)": 12},
             {"name": "Beezlebub", "weight (kg)": 20},
@@ -38115,16 +38115,9 @@ var App = React.createClass({displayName: 'App',
     render:function(){
       return (
         React.DOM.div({className: "wrapper"}, 
-          Bar({
-            width: this.props.width, 
-            height: this.props.height, 
-            type: "cats", 
-
-            title: "Weight of Cats", 
-            data: this.props.data, 
-            yAxisName: "weight (kg)", 
-            xAxisName: "name"
-          }
+          Map(null, 
+            "width=", this.props.width, 
+            "height=", this.props.height
           )
         )
       )

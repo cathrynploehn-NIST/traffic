@@ -7,7 +7,7 @@ var App = React.createClass({
     getDefaultProps: function() {
       return {
         width: window.innerWidth,
-        height: 500,
+        height: window.innerHeight,
         data: [
             {"name": "Ashley", "weight (kg)": 12},
             {"name": "Beezlebub", "weight (kg)": 20},
@@ -22,17 +22,10 @@ var App = React.createClass({
     render:function(){
       return (
         <div className="wrapper">
-          <Bar 
+          <Map>
             width={this.props.width}
             height={this.props.height} 
-            type="cats"
-
-            title="Weight of Cats"
-            data={this.props.data}
-            yAxisName="weight (kg)"
-            xAxisName="name"
-          >
-          </Bar>
+          </Map>
         </div>
       )
     }
