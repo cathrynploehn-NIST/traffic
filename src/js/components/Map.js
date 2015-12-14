@@ -46,7 +46,6 @@ var Overlay = React.createClass({
         var canvasOffset = $(id).offset();
   
         d3.csv(overlayTypes[this.props.type].location, function(error, data){
-            console.log(data);
             thisObj.setState({
                 data: data,
                 ctx: ctxObj,
@@ -203,6 +202,7 @@ var BackgroundLayer = React.createClass({
     if(this.state.ctx && this.props.tiles){
       this.drawCanvas();
     }
+    console.log(this.props.height)
 
     return (
         <canvas 
@@ -275,6 +275,8 @@ var Map = React.createClass({
             backgroundLayers = [],
             overlays = [];
 
+            console.log(this.props.height)
+
         for(layer in backgroundLayerTypes){
             backgroundLayers.push(
               <BackgroundLayer 
@@ -291,8 +293,8 @@ var Map = React.createClass({
                 <Overlay 
                     type={overlay}
                     projection={this.state.projection} 
-                    width={this.props.width}
-                    height={this.props.height} >
+                    width={thisObj.props.width}
+                    height={thisObj.props.height} >
                 </Overlay>
             );
         };

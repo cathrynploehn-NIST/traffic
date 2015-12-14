@@ -37829,7 +37829,6 @@ var Overlay = React.createClass({displayName: 'Overlay',
         var canvasOffset = $(id).offset();
   
         d3.csv(overlayTypes[this.props.type].location, function(error, data){
-            console.log(data);
             thisObj.setState({
                 data: data,
                 ctx: ctxObj,
@@ -37986,6 +37985,7 @@ var BackgroundLayer = React.createClass({displayName: 'BackgroundLayer',
     if(this.state.ctx && this.props.tiles){
       this.drawCanvas();
     }
+    console.log(this.props.height)
 
     return (
         React.DOM.canvas({
@@ -38058,6 +38058,8 @@ var Map = React.createClass({displayName: 'Map',
             backgroundLayers = [],
             overlays = [];
 
+            console.log(this.props.height)
+
         for(layer in backgroundLayerTypes){
             backgroundLayers.push(
               BackgroundLayer({
@@ -38074,8 +38076,8 @@ var Map = React.createClass({displayName: 'Map',
                 Overlay({
                     type: overlay, 
                     projection: this.state.projection, 
-                    width: this.props.width, 
-                    height: this.props.height}
+                    width: thisObj.props.width, 
+                    height: thisObj.props.height}
                 )
             );
         };
@@ -38115,11 +38117,22 @@ var App = React.createClass({displayName: 'App',
     render:function(){
       return (
         React.DOM.div({className: "wrapper"}, 
-          Map(null, 
-            "width=", this.props.width, 
-            "height=", this.props.height
+          Map({
+            width: this.props.width, 
+            height: this.props.height}
           )
         )
+        // <Bar 
+        //   width={this.props.width}
+        //   height={500} 
+        //   type="cats"
+
+        //   title="Weight of Cats"
+        //   data={this.props.data}
+        //   yAxisName="weight (kg)"
+        //   xAxisName="name"
+        // >
+        // </Bar>
       )
     }
   });

@@ -2,7 +2,6 @@
 var React = require('react');
 var Bar = require('../components/Bar.js');
 var Map = require('../components/Map.js');
-var Bar = require('../components/Bar.js');
 
 var App = React.createClass({
     getDefaultProps: function() {
@@ -23,11 +22,22 @@ var App = React.createClass({
     render:function(){
       return (
         <div className="wrapper">
-          <Map>
+          <Map 
             width={this.props.width}
-            height={this.props.height} 
+            height={this.props.height}>
           </Map>
         </div>
+        // <Bar 
+        //   width={this.props.width}
+        //   height={500} 
+        //   type="cats"
+
+        //   title="Weight of Cats"
+        //   data={this.props.data}
+        //   yAxisName="weight (kg)"
+        //   xAxisName="name"
+        // >
+        // </Bar>
       )
     }
   });
