@@ -37602,20 +37602,6 @@ module.exports = require('./lib/React');
 /** @jsx React.DOM */
 var React = require('react');
 var d3 = require('d3');
-var renderQueue = require('../util/renderqueue.js');
-var $ = require('jquery');
-
-var Bar = React.createClass({displayName: 'Bar',
-    render:function(){
-        return (React.DOM.div(null));
-    }
-});
-
-module.exports = Bar;
-},{"../util/renderqueue.js":156,"d3":2,"jquery":4,"react":150}],153:[function(require,module,exports){
-/** @jsx React.DOM */
-var React = require('react');
-var d3 = require('d3');
 var topojson = require('topojson');
 var d3geotile = require('d3.geo.tile');
 var renderQueue = require('../util/renderqueue.js');
@@ -37952,11 +37938,10 @@ var Map = React.createClass({displayName: 'Map',
 });
 
 module.exports = Map;
-},{"../util/renderqueue.js":156,"d3":2,"d3.geo.tile":1,"jquery":4,"react":150,"topojson":151}],154:[function(require,module,exports){
+},{"../util/renderqueue.js":155,"d3":2,"d3.geo.tile":1,"jquery":4,"react":150,"topojson":151}],153:[function(require,module,exports){
 /** @jsx React.DOM */
 var React = require('react');
 var Map = require('../components/Map.js');
-var Bar = require('../components/Bar.js');
 
 var App = React.createClass({displayName: 'App',
     getDefaultProps: function() {
@@ -37980,7 +37965,7 @@ var App = React.createClass({displayName: 'App',
 
 module.exports = App;
 
-},{"../components/Bar.js":152,"../components/Map.js":153,"react":150}],155:[function(require,module,exports){
+},{"../components/Map.js":152,"react":150}],154:[function(require,module,exports){
 /** @jsx React.DOM */
 var React = require('react');
 
@@ -37990,7 +37975,7 @@ var App = require('./components/app.js');
 
 React.render(App(null),document.getElementById('main'));
 
-},{"./components/app.js":154,"react":150}],156:[function(require,module,exports){
+},{"./components/app.js":153,"react":150}],155:[function(require,module,exports){
 var renderQueue = (function(func) {
   var _queue = [],                  // data to be rendered
       _rate = 1000,                 // number of calls per frame, max 1,000
@@ -38078,4 +38063,4 @@ var renderQueue = (function(func) {
 module.exports = renderQueue;
 
 
-},{}]},{},[155])
+},{}]},{},[154])
